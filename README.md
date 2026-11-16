@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Responsible Vulnerability Disclosure Report
 
-## Getting Started
+## Unauthenticated Access to Training Application Data - Broken Object Level Authorization
 
-First, run the development server:
+**Target:** https://www.datheon.in
+**Date Tested:** 05 November 2026
+**Researcher:** Emihle
+**Status:** Disclosed for Educational / Training Assessment
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 1. Executive Summary
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+An unauthenticated Broken Object Level Authorization (BOLA / IDOR) vulnerability was identified in the Training Application API.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The endpoint `/api/training/auth-app` returns full personal application data for any user when supplied with only their email address as a URL query parameter. No login, session cookie, Authorization header, or token is required.
 
-## Learn More
+Any remote attacker who knows or guesses a victim's email address can retrieve their full application record.
 
-To learn more about Next.js, take a look at the following resources:
+## 2. Severity - CVSS 3.1
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Score: 7.5 - HIGH**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Vector:** CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N
 
-## Deploy on Vercel
+The vulnerability allows unauthenticated disclosure of sensitive personal data.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 3. Affected Endpoint
+GET https://www.datheon.in/api/training/auth-app?email=victim@example.com
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 4. Proof of Concept
+
+No authentication required. Changing the `email` parameter returns a different user's full application data.
+
+## 5. Impact
+
+- Exposure of full names, emails, phone numbers, ID numbers
+- Privacy violation and identity theft risk
+- Mass enumeration of applicant data
+
+## 6. Remediation
+
+- Require authentication (session / JWT) on all API endpoints
+- Enforce server-side authorization: only return data belonging to the logged-in user
+- Never trust `email` or `id` from URL query parameters alone
+- Return 401 if not logged in, 403 if accessing another user's data
+
+## 7. Fix Implemented in This Repo
+
+Fixed in `app/api/candidates/[id]/route.ts`:
+
+- Checks `x-user-email` header
+- Returns 401 if not logged in
+- Returns 404 if candidate does not belong to the logged-in user
+- Only the owner can view their own record
